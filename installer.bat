@@ -9,13 +9,13 @@ IF NOT %errorLevel% == 0 (
 
 REM Clear the screen and write a placeholder for the PowerShell output.
 CLS
-ECHO =============================
+ECHO ================================================================================
 ECHO PowerShell output shows here:
 ECHO.
 ECHO.
 ECHO.
 ECHO.
-ECHO =============================
+ECHO ================================================================================
 
 REM Print the script version.
 SET version=1.0
@@ -54,8 +54,7 @@ SET python_installer_url=https://www.python.org/ftp/python/%target_python_versio
 SET python_installer_path=%installer_directory%\%python_installer_name%.exe
 SET python_directory=%portly_root_directory%\libraries\python
 
-IF EXIST %python_installer_path% DEL %python_installer_path%
-
+ECHO --------------------------------------------------------------------------------
 ECHO Removing any previous copies of Python
 SET python_uninstaller_path=%python_directory%\%python_installer_name%.exe
 IF EXIST %python_uninstaller_path% START /WAIT %python_uninstaller_path% /passive /uninstall
@@ -97,6 +96,7 @@ SET git_directory=%portly_root_directory%\libraries\git
 
 IF EXIST %git_installer_path% DEL %git_installer_path%
 
+ECHO --------------------------------------------------------------------------------
 ECHO Removing any previous copies of Git
 SET git_uninstaller_path=%git_directory%\unins000.exe
 IF EXIST %git_uninstaller_path% START /WAIT %git_uninstaller_path% /silent
@@ -128,6 +128,7 @@ SET ruby_directory=%portly_root_directory%\libraries\ruby
 
 IF EXIST %ruby_installer_path% DEL %ruby_installer_path%
 
+ECHO --------------------------------------------------------------------------------
 ECHO Removing any previous copies of Ruby
 SET ruby_uninstaller_path=%ruby_directory%\unins000.exe
 IF EXIST %ruby_uninstaller_path% START /WAIT %ruby_uninstaller_path% /silent
@@ -154,7 +155,10 @@ IF NOT "%ruby_test_output%" == "%target_ruby_version%" (
 REM -----------------------------
 REM Clone the project repository.
 REM -----------------------------
-set %git_executable%=%git_directory%\bin\git
+set git_executable=%git_directory%\bin\git
+
+ECHO -----------------------------------------
+ECHO Fetching repository code base from GitHub
 %git_executable% init
 %git_executable% remote add origin https://github.com/UndeadScythes/Portly.git
 %git_executable% fetch
