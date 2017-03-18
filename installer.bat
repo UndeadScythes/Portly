@@ -154,10 +154,11 @@ IF NOT "%ruby_test_output%" == "%target_ruby_version%" (
 REM -----------------------------
 REM Clone the project repository.
 REM -----------------------------
-SET src_directory=%portly_root_directory%\src
-IF EXIST %src_directory% RMDIR /S /Q %src_directory%
-IF NOT EXIST %src_directory% MKDIR %src_directory%
-%git_directory%\bin\git clone https://github.com/UndeadScythes/Portly.git %src_directory%
+set %git_executable%=%git_directory%\bin\git
+%git_executable% init
+%git_executable% remote add origin https://github.com/UndeadScythes/Portly.git
+%git_executable% fetch
+%git_executable% checkout -t origin/master
 
 :remove_download_script
 REM Remove the download script and installers.
