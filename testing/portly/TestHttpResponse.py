@@ -38,13 +38,15 @@ class TestHttpResponse(unittest.TestCase):
         testing_directory = os.getcwd()
         
         # Jump up a level and fire up the Portly webserver.
-        os.chdir("../src")
-        print("\nStarting up a Portly WebServer and waiting 5 seconds")
+        os.chdir("..")
+        portly_root = os.getcwd()
+        os.chdir("src")
+        print("\nStarting up a Portly WebServer and waiting 2 seconds")
         print("--------------------------------------------------------------------------------")
-        self.portly_server = subprocess.Popen(["ruby", "portly.rb"])
+        self.portly_server = subprocess.Popen(["ruby", "portly.rb", "-r", portly_root, "-c", os.path.join(portly_root, "portly_config.yaml")])
         
         # Wait for the port to be open then return to the testing directory.
-        time.sleep(5)
+        time.sleep(2)
         os.chdir(testing_directory)
     
     # ------------------------------------------    
@@ -54,12 +56,12 @@ class TestHttpResponse(unittest.TestCase):
     
         # Kill the server.
         print("--------------------------------------------------------------------------------")
-        print("Trying to kill the Portly WebServer, waiting 5 seconds")
+        print("Trying to kill the Portly WebServer, waiting 3 seconds")
         while self.portly_server.poll() == None:
             self.portly_server.kill()
             
         # Wait for port 80 to die then wait for the server to close.
-        time.sleep(5)
+        time.sleep(3)
     
     # ----------------------------------------------
     # Test each of the supported 200 response codes.

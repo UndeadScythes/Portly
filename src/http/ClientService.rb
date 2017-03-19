@@ -5,6 +5,8 @@ require "Http"
 # This class serves a client based on their request.
 # ==================================================
 class ClientService
+
+    @@LOGGER = LogManager.get_logger("ClientService")
     
     # ----------------------------
     # Create a new client service.
@@ -26,7 +28,7 @@ class ClientService
         begin
             start_line, header_fields, message_body = Http.parse_http_message(@client)
         
-            puts("Serving hard coded response")
+            @@LOGGER.debug("Serving hard coded response")
         
             @client.puts("HTTP/1.1 200 OK\r\n\r\nPortly WebServer\r\n")
         
@@ -34,7 +36,7 @@ class ClientService
             
         rescue HttpClientError => error
         
-            puts("Client error raised")
+            @@LOGGER.info("Client error raised: [#{error.error_code}] #{error}")
             
             @client.puts("HTTP/1.1 #{error.error_code} #{error}\r\n\r\n")
             
@@ -42,7 +44,7 @@ class ClientService
         
         rescue HttpConnectionClosed => error
         
-            puts("Connection was closed by client")
+            @@LOGGER.info("Connection was closed by client")
         
         end
         

@@ -9,6 +9,8 @@ require "Crypto"
 # =====================================================================
 class HttpListener
 
+    @@LOGGER = LogManager.get_logger("HTTPListener")
+
     # ----------------------
     # Initialise this class.
     # ----------------------
@@ -18,7 +20,7 @@ class HttpListener
         
         @connected_clients = {}
 
-        puts("Server created on port #{port}")
+        @@LOGGER.info("Server created on port #{port}")
         
     end
 
@@ -31,8 +33,8 @@ class HttpListener
         
             client = @server.accept
             
-            puts("=" * 80)
-            puts("Connection received from #{client.peeraddr(true)}")
+            @@LOGGER.debug("=" * 80)
+            @@LOGGER.info("Connection received from #{client.peeraddr()}")
             
             client_service = ClientService.new(client, self)
             

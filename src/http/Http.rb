@@ -7,12 +7,14 @@ require "HttpConnectionClosed"
 # =======================================================================================
 class Http
 
+    @@LOGGER = LogManager.get_logger("HTTP")
+
     # -----------------------------
     # Parse a HTTP message request.
     # -----------------------------
     def self.parse_http_message(client)
         
-        puts("Starting HTTP message parsing")
+        @@LOGGER.debug("Starting HTTP message parsing")
         
         request_line = client.gets
 
@@ -20,7 +22,7 @@ class Http
             raise HttpConnectionClosed.new
         end
         
-        puts("Request line was #{request_line}")
+        @@LOGGER.debug("Request line was #{request_line}")
             
         method, request_target, http_version = request_line.split(" ", 3)
         
@@ -29,7 +31,7 @@ class Http
             raise HttpClientError.new(400, "Bad HTTP version in request line")
         end
         
-        puts("Start line received: #{request_line}")
+        @@LOGGER.debug("Start line received: #{request_line}")
         
         header_fields = {}
         while line = client.gets do
@@ -37,7 +39,7 @@ class Http
                 break
             end
             
-            puts("Header line received: #{line}")
+            @@LOGGER.debug("Header line received: #{line}")
             
             field_name, field_value = self.parse_header_field(line)
             
@@ -63,7 +65,7 @@ class Http
         
         # According to RFC7230 Section 5.4 all HTTP/1.1 requests must include a host header field.
         if http_version_number == "1.1"
-            puts("Checking for host header field")
+            @@LOGGER.debug("Checking for host header field")
             if not header_fields.has_key?("host")
                 raise HttpClientError.new(400, "No host header field")
             end            
@@ -75,7 +77,7 @@ class Http
         end
         
         # According to RCF7230 Section 3.3 the presence of Content-Length or Transfer-Encoding signal the presence of a message body.
-        puts("Determine if we have a message body")
+        @@LOGGER.debug("Determine if we have a message body")
         if header_fields.has_key?("content-length") or header_fields.has_key?("transfer-encoding")
         
             if header_fields.has_key?("content-length")
@@ -86,20 +88,20 @@ class Http
                     
             end
         
-            puts("Message body beginning")
+            @@LOGGER.debug("Message body beginning")
             
             message_body = []
             while line = client.gets do
                 message_body << line
                 
-                puts("Received #{line}")
+                @@LOGGER.debug("Received #{line}")
                 
             end
             message_body = message_body.join("\r\n")
 
         end
             
-        puts("End of HTTP message")
+        @@LOGGER.debug("End of HTTP message")
         
         return request_line, header_fields, message_body
         

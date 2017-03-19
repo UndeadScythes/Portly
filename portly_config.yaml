@@ -1,0 +1,7 @@
+--- # Use %PORTLY% to denote the root filepath.
+
+--- # Specify which ports to listen for HTTP.
+http_ports: [80]
+
+--- # Specify the directory where log files should be placed.
+log_path: %PORTLY%/logs
