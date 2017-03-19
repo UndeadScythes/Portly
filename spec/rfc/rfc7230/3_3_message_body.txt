@@ -1,0 +1,31 @@
+RFC 7230
+
+3.3. Message Body
+
+The message body (if any) of an HTTP message is used to carry the
+payload body of that request or response. The message body is
+identical to the payload body unless a transfer coding has been
+applied, as described in Section 3.3.1.
+
+    message-body = *OCTET
+    
+The rules for when a message body is allowed in a message differ for
+requests and responses.
+
+The presence of a message body in a request is signaled by a
+Content-Length or Transfer-Encoding header field. Request message
+framing is independent of method semantics, even if the method does
+not define any use for a message body.
+
+The presence of a message body in a response depends on both the
+request method to which it is responding and the response status code
+(Section 3.1.2). Responses to the HEAD request method (Section 4.3.2
+of [RFC7231]) never include a message body because the associated
+response header fields (e.g., Transfer-Encoding, Content-Length,
+etc.), if present, indicate only what their values would have been if
+the request method had been GET (Section 4.3.1 of [RFC7231]). 2xx
+(Successful) responses to a CONNECT request method (Section 4.3.6 of
+[RFC7231]) switch to tunnel mode instead of having a message body.
+All 1xx (Informational), 204 (No Content), and 304 (Not Modified)
+responses do not include a message body. All other responses do
+include a message body, although the body might be of zero length.
