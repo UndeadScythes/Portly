@@ -27,7 +27,11 @@ class ClientService
         rescue HttpClientError => error
             
             @client.puts("HTTP/1.1 #{error.error_code} #{error}\r\n\r\n")
-            
+        
+        rescue HttpConnectionClosed => error
+        
+            puts("Connection was closed by client")
+        
         end
         
     end

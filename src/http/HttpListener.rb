@@ -36,7 +36,13 @@ class HttpListener
     end
     
     def wait
+    
         @thread.join
+        
+        puts("Closing server")
+        
+        @server.close
+        
     end
 
 end

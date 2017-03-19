@@ -1,0 +1,2 @@
+class HttpConnectionClosed < StandardError
+end
