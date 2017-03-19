@@ -1,10 +1,16 @@
+# Add all oyr sub folders to the Ruby load path.
 Dir.foreach(".") do |entry|
-    puts("adding #{entry} to the load path")
-    $LOAD_PATH << entry
+    if File.directory?(entry)
+    
+        # Ignore "." and "..".
+        if not entry[/\.{1,2}/]
+            $LOAD_PATH << entry
+        end
+    end
 end
 
 require "HttpListener"
 
-http = HttpListener.new(80)
+http = Thread.new { HttpListener.new(80).listen }
 
-http.wait
+http.join

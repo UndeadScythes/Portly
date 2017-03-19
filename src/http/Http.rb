@@ -1,21 +1,27 @@
+# Include the exception classes for the HTTP errors.
 require "HttpClientError"
 require "HttpConnectionClosed"
 
-# RFC7230: Hypertext Transfer Protocol (HTTP/1.1): Message Syntax and Routing
-
+# =======================================================================================
+# This class allows us to perform operations with various parts of HTTP request messages.
+# =======================================================================================
 class Http
 
-    # Parse a HTTP message according to the format laid out in RFC7230 Section 3 'Message Format'.
+    # -----------------------------
+    # Parse a HTTP message request.
+    # -----------------------------
     def self.parse_http_message(client)
         
         puts("Starting HTTP message parsing")
         
         request_line = client.gets
-        
+
         if request_line == nil
             raise HttpConnectionClosed.new
         end
         
+        puts("Request line was #{request_line}")
+            
         method, request_target, http_version = request_line.split(" ", 3)
         
         # This HTTP version number format is as specified in RFC7230 Section 2.6.
@@ -99,7 +105,9 @@ class Http
         
     end
 
-    # Parse a field header according to the format laid out in RFC7230 Section 3.2 'Header Fields'.
+    # ---------------------
+    # Parse a field header.
+    # ---------------------
     def self.parse_header_field(header_field)
         
         field_name, field_value = header_field.split(":", 2)
@@ -111,7 +119,9 @@ class Http
         
     end
     
+    # ------------------------------------------------------------------------------------
     # Parse header fields and find a unique value, if one cannot be found then return nil.
+    # ------------------------------------------------------------------------------------
     def self.get_unique_or_nil(header_fields)
         
         # If we were given something array like then re-parse each individual entry.
