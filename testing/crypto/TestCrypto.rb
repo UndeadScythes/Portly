@@ -1,5 +1,5 @@
 require "test/unit"
-require_relative "../../src/crypto/Crypto"
+require "Crypto"
 
 class TestCrypto < Test::Unit::TestCase
 
