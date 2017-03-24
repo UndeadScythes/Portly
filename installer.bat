@@ -19,12 +19,25 @@ ECHO ===========================================================================
 
 REM Print the script version.
 SET version=1.0
-ECHO Running MS Installer Script v%version%
+ECHO Running Portly MS Installer Script v%version%
 
 REM Set the software versions that we will install.
 SET target_ruby_version=2.3.3
 SET target_git_version=2.12.0
 SET target_python_version=3.6.0
+SET target_mariadb_version=10.1.22
+
+REM Set credentials for anything that requires a username or password.
+SET mariadb_root_password=portly
+
+REM Set flags to run each part of this installer.
+SET install_ruby=false
+SET install_git=false
+SET install_python=false
+SET install_mariadb=false
+SET fetch_from_github=false
+SET run_mariadb_setup_sql=true
+SET remove_installers=true
 
 REM Get the current path and set it as the Portly root path.
 CD %~dp0
@@ -47,126 +60,182 @@ ECHO Invoke-WebRequest -Uri $source_url -OutFile $destination_directory>>%downlo
 REM The order of these installers is entirely arbitrary and is based only on the debugging performed whilst writing the script.
 
 REM ---------------
+REM Install MariaDB.
+REM ---------------
+IF NOT %install_mariadb%==true GOTO skip_install_mariadb
+
+    SET mariadb_installer_name=mariadb_installer
+    SET mariadb_installer_url=https://downloads.mariadb.org/f/mariadb-%target_mariadb_version%/winx64-packages/mariadb-%target_mariadb_version%-winx64.msi/from/http%%3A//mirror.sax.uk.as61049.net/mariadb/?serve
+    SET mariadb_installer_path=%installer_directory%\%mariadb_installer_name%.msi
+    SET mariadb_directory=%portly_root_directory%\libraries\mariadb
+
+    ECHO --------------------------------------------------------------------------------
+    ECHO Removing any previous copies of MariaDB
+    SET mariadb_uninstaller_path=%mariadb_directory%\%mariadb_installer_name%.msi
+    IF EXIST %mariadb_uninstaller_path% msiexec /i %mariadb_installer_path% REMOVE=ALL CLEANUPDATA=1 /qn
+    IF EXIST %mariadb_directory% RMDIR /S /Q %mariadb_directory%
+
+    ECHO Downloading MariaDB installer v%target_mariadb_version%
+    PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %mariadb_installer_url% %mariadb_installer_path%
+    ECHO Installing MariaDB v%target_mariadb_version%
+    msiexec /i %mariadb_installer_path% INSTALLDIR=%mariadb_directory% PASSWORD=%mariadb_root_password% SERVICENAME=MySQL UTF8 /qn /L*V "%log_file_directory%\%mariadb_installer_name%.log"
+    ECHO MariaDB installation complete
+
+    REM MariaDB uses the installer for uninstalling so we will copy it over to the MariaDB directory.
+    COPY %mariadb_installer_path% %mariadb_directory%\%mariadb_installer_name%.msi>NUL
+
+    SET "full_mariadb_version=%target_mariadb_version%-MariaDB"
+    FOR /F "DELIMS=" %%i IN ('%mariadb_directory%\bin\mysql --user^=root --password^=%mariadb_root_password% mysql --execute^="SELECT VERSION();"') DO SET mariadb_test_output=%%i
+    IF NOT "%mariadb_test_output%" == "%full_mariadb_version%" (
+        ECHO MariaDB installation failed - %mariadb_test_output%
+        FIND /N /I "error" %log_file_directory%\%mariadb_installer_name%.log
+        GOTO remove_download_script
+    ) ELSE ECHO MariaDB installation OK
+
+:skip_install_mariadb
+
+REM ---------------
 REM Install Python.
 REM ---------------
-SET python_installer_name=python_installer
-SET python_installer_url=https://www.python.org/ftp/python/%target_python_version%/python-%target_python_version%.exe
-SET python_installer_path=%installer_directory%\%python_installer_name%.exe
-SET python_directory=%portly_root_directory%\libraries\python
+IF NOT %install_python%==true GOTO skip_install_python
 
-ECHO --------------------------------------------------------------------------------
-ECHO Removing any previous copies of Python
-SET python_uninstaller_path=%python_directory%\%python_installer_name%.exe
-IF EXIST %python_uninstaller_path% START /WAIT %python_uninstaller_path% /passive /uninstall
-DEL "%UserProfile%\AppData\local\temp\Python %target_python_version%*.log"
-IF EXIST %python_directory% RMDIR /S /Q %python_directory%
+    SET python_installer_name=python_installer
+    SET python_installer_url=https://www.python.org/ftp/python/%target_python_version%/python-%target_python_version%.exe
+    SET python_installer_path=%installer_directory%\%python_installer_name%.exe
+    SET python_directory=%portly_root_directory%\libraries\python
 
-ECHO Downloading Python installer v%target_python_version%
-PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %python_installer_url% %python_installer_path%
-ECHO Installing Python v%target_python_version%
-START /WAIT %python_installer_path% /passive TargetDir=%python_directory% Shortcuts=0 Include_doc=0 Include_launcher=0 Include_pip=0 Include_tcltk=0 Include_test=0 Include_tools=0
-ECHO Python installation complete
+    ECHO --------------------------------------------------------------------------------
+    ECHO Removing any previous copies of Python
+    SET python_uninstaller_path=%python_directory%\%python_installer_name%.exe
+    IF EXIST %python_uninstaller_path% START /WAIT %python_uninstaller_path% /passive /uninstall
+    DEL "%UserProfile%\AppData\local\temp\Python %target_python_version%*.log"
+    IF EXIST %python_directory% RMDIR /S /Q %python_directory%
 
-REM Python uses the installer for uninstalling so we will copy it over to the Python directory.
-COPY %python_installer_path% %python_directory%\%python_installer_name%.exe>NUL
+    ECHO Downloading Python installer v%target_python_version%
+    PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %python_installer_url% %python_installer_path%
+    ECHO Installing Python v%target_python_version%
+    START /WAIT %python_installer_path% /passive TargetDir=%python_directory% Shortcuts=0 Include_doc=0 Include_launcher=0 Include_pip=0 Include_tcltk=0 Include_test=0 Include_tools=0
+    ECHO Python installation complete
 
-REM Move the install log to the logs folder.
-MOVE "%UserProfile%\AppData\local\temp\Python %target_python_version%*.log" %log_file_directory%>NUL
-DEL %log_file_directory%\*JustForMe.log
-MOVE "%log_file_directory%\Python %target_python_version%*.log" %log_file_directory%\%python_installer_name%.log>NUL
+    REM Python uses the installer for uninstalling so we will copy it over to the Python directory.
+    COPY %python_installer_path% %python_directory%\%python_installer_name%.exe>NUL
 
-SET python_test_name=python_test.py
-ECHO import sys>>%python_test_name%
-ECHO print(sys.version)>>%python_test_name%
-FOR /F %%i IN ('%python_directory%\python %python_test_name%') DO SET python_test_output=%%i
-IF EXIST %python_test_name% DEL %python_test_name%
-IF NOT "%python_test_output%" == "%target_python_version%" (
-    ECHO Python installation failed - %python_test_ouput%
-    FIND /N /I "error" %log_file_directory%\%python_installer_name%.log
-    GOTO remove_download_script
-) ELSE ECHO Python installation OK
+    REM Move the install log to the logs folder.
+    MOVE "%UserProfile%\AppData\local\temp\Python %target_python_version%*.log" %log_file_directory%>NUL
+    DEL %log_file_directory%\*JustForMe.log
+    MOVE "%log_file_directory%\Python %target_python_version%*.log" %log_file_directory%\%python_installer_name%.log>NUL
+
+    SET python_test_name=python_test.py
+    ECHO import sys>>%python_test_name%
+    ECHO print(sys.version)>>%python_test_name%
+    FOR /F %%i IN ('%python_directory%\python %python_test_name%') DO SET python_test_output=%%i
+    IF EXIST %python_test_name% DEL %python_test_name%
+    IF NOT "%python_test_output%" == "%target_python_version%" (
+        ECHO Python installation failed - %python_test_ouput%
+        FIND /N /I "error" %log_file_directory%\%python_installer_name%.log
+        GOTO remove_download_script
+    ) ELSE ECHO Python installation OK
+
+:skip_install_python
 
 REM ------------
 REM Install Git.
 REM ------------
-SET git_installer_name=git_installer
-SET git_installer_url=https://github.com/git-for-windows/git/releases/download/v%target_git_version%.windows.1/Git-%target_git_version%-64-bit.exe
-SET git_installer_path=%installer_directory%\%git_installer_name%.exe
-SET git_directory=%portly_root_directory%\libraries\git
+IF NOT %install_git%==true GOTO skip_install_git
 
-IF EXIST %git_installer_path% DEL %git_installer_path%
+    SET git_installer_name=git_installer
+    SET git_installer_url=https://github.com/git-for-windows/git/releases/download/v%target_git_version%.windows.1/Git-%target_git_version%-64-bit.exe
+    SET git_installer_path=%installer_directory%\%git_installer_name%.exe
+    SET git_directory=%portly_root_directory%\libraries\git
 
-ECHO --------------------------------------------------------------------------------
-ECHO Removing any previous copies of Git
-SET git_uninstaller_path=%git_directory%\unins000.exe
-IF EXIST %git_uninstaller_path% START /WAIT %git_uninstaller_path% /silent
-IF EXIST %git_directory% RMDIR /S /Q %git_directory%
+    IF EXIST %git_installer_path% DEL %git_installer_path%
 
-ECHO Downloading Git installer v%target_git_version%
-PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %git_installer_url% %git_installer_path%
-ECHO Installing Git v%target_git_version%
-START /WAIT %git_installer_path% /SILENT /DIR="%git_directory%" /LOG="%log_file_directory%\%git_installer_name%.log"
-ECHO Git installation complete
+    ECHO --------------------------------------------------------------------------------
+    ECHO Removing any previous copies of Git
+    SET git_uninstaller_path=%git_directory%\unins000.exe
+    IF EXIST %git_uninstaller_path% START /WAIT %git_uninstaller_path% /silent
+    IF EXIST %git_directory% RMDIR /S /Q %git_directory%
 
-SET "full_git_version=git version %target_git_version%.windows.1"
-FOR /F "DELIMS=" %%i IN ('%git_directory%\bin\git --version') DO SET git_test_output=%%i
-IF NOT "%git_test_output%" == "%full_git_version%" (
-    ECHO Git installation failed - %git_test_output%
-    FIND /N /I "error" %log_file_directory%\%git_installer_name%.log
-    GOTO remove_download_script
-) ELSE (
-    ECHO Git installation OK
-)
+    ECHO Downloading Git installer v%target_git_version%
+    PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %git_installer_url% %git_installer_path%
+    ECHO Installing Git v%target_git_version%
+    START /WAIT %git_installer_path% /SILENT /DIR="%git_directory%" /LOG="%log_file_directory%\%git_installer_name%.log"
+    ECHO Git installation complete
+
+    SET "full_git_version=git version %target_git_version%.windows.1"
+    FOR /F "DELIMS=" %%i IN ('%git_directory%\bin\git --version') DO SET git_test_output=%%i
+    IF NOT "%git_test_output%" == "%full_git_version%" (
+        ECHO Git installation failed - %git_test_output%
+        FIND /N /I "error" %log_file_directory%\%git_installer_name%.log
+        GOTO remove_download_script
+    ) ELSE ECHO Git installation OK
+
+:skip_install_git
 
 REM -------------
 REM Install Ruby.
 REM -------------
-SET ruby_installer_name=ruby_installer
-SET ruby_installer_url=https://dl.bintray.com/oneclick/rubyinstaller/rubyinstaller-%target_ruby_version%-x64.exe
-SET ruby_installer_path=%installer_directory%\%ruby_installer_name%.exe
-SET ruby_directory=%portly_root_directory%\libraries\ruby
+IF NOT %install_ruby%==true GOTO skip_install_ruby
 
-IF EXIST %ruby_installer_path% DEL %ruby_installer_path%
+    SET ruby_installer_name=ruby_installer
+    SET ruby_installer_url=https://dl.bintray.com/oneclick/rubyinstaller/rubyinstaller-%target_ruby_version%-x64.exe
+    SET ruby_installer_path=%installer_directory%\%ruby_installer_name%.exe
+    SET ruby_directory=%portly_root_directory%\libraries\ruby
 
-ECHO --------------------------------------------------------------------------------
-ECHO Removing any previous copies of Ruby
-SET ruby_uninstaller_path=%ruby_directory%\unins000.exe
-IF EXIST %ruby_uninstaller_path% START /WAIT %ruby_uninstaller_path% /silent
-IF EXIST %ruby_directory% RMDIR /S /Q %ruby_directory%
+    IF EXIST %ruby_installer_path% DEL %ruby_installer_path%
 
-ECHO Downloading Ruby installer v%target_ruby_version%
-PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %ruby_installer_url% %ruby_installer_path%
-ECHO Installing Ruby v%target_ruby_version%
-START /WAIT %ruby_installer_path% /SILENT /DIR="%ruby_directory%" /TASKS="modpath" /LOG="%log_file_directory%\%ruby_installer_name%.log"
-ECHO Ruby installation complete
+    ECHO --------------------------------------------------------------------------------
+    ECHO Removing any previous copies of Ruby
+    SET ruby_uninstaller_path=%ruby_directory%\unins000.exe
+    IF EXIST %ruby_uninstaller_path% START /WAIT %ruby_uninstaller_path% /silent
+    IF EXIST %ruby_directory% RMDIR /S /Q %ruby_directory%
 
-SET ruby_test_name=ruby_test.rb
-ECHO puts("#{RUBY_VERSION}")>>%ruby_test_name%
-FOR /F %%i IN ('%ruby_directory%\bin\ruby %ruby_test_name%') DO SET ruby_test_output=%%i
-IF EXIST %ruby_test_name% DEL %ruby_test_name%
-IF NOT "%ruby_test_output%" == "%target_ruby_version%" (
-    ECHO Ruby installation failed - %ruby_test_output%
-    FIND /N /I "error" %log_file_directory%\%ruby_installer_name%.log
-    GOTO remove_download_script
-) ELSE (
-    ECHO Ruby installation OK
-)
+    ECHO Downloading Ruby installer v%target_ruby_version%
+    PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %ruby_installer_url% %ruby_installer_path%
+    ECHO Installing Ruby v%target_ruby_version%
+    START /WAIT %ruby_installer_path% /SILENT /DIR="%ruby_directory%" /TASKS="modpath" /LOG="%log_file_directory%\%ruby_installer_name%.log"
+    ECHO Ruby installation complete
+
+    SET ruby_test_name=ruby_test.rb
+    ECHO puts("#{RUBY_VERSION}")>>%ruby_test_name%
+    FOR /F %%i IN ('%ruby_directory%\bin\ruby %ruby_test_name%') DO SET ruby_test_output=%%i
+    IF EXIST %ruby_test_name% DEL %ruby_test_name%
+    IF NOT "%ruby_test_output%" == "%target_ruby_version%" (
+        ECHO Ruby installation failed - %ruby_test_output%
+        FIND /N /I "error" %log_file_directory%\%ruby_installer_name%.log
+        GOTO remove_download_script
+    ) ELSE ECHO Ruby installation OK
+
+:skip_install_ruby
 
 REM -----------------------------
 REM Clone the project repository.
 REM -----------------------------
-set git_executable=%git_directory%\bin\git
+IF NOT %fetch_from_github%==true GOTO skip_fetch_from_github
 
-ECHO -----------------------------------------
-ECHO Fetching repository code base from GitHub
-%git_executable% init
-%git_executable% remote add origin https://github.com/UndeadScythes/Portly.git
-%git_executable% fetch
-%git_executable% checkout -t origin/master
+    SET git_executable=%git_directory%\bin\git
 
-:remove_download_script
+    ECHO -----------------------------------------
+    ECHO Fetching repository code base from GitHub
+    %git_executable% init
+    %git_executable% remote add origin https://github.com/UndeadScythes/Portly.git
+    %git_executable% fetch
+    %git_executable% checkout -t origin/master
+
+:skip_fetch_from_github
+
+REM ---------------------------------------------    
+REM Run any SQL scripts for the setup of MariaDB.
+REM ---------------------------------------------
+IF NOT %run_mariadb_setup_sql%==true GOTO skip_run_mariadb_setup_script
+
+    FOR /F %%f IN ('DIR /B setup_sql\mariadb\*.sql') DO libraries\mariadb\bin\mysql --user=root --password=%mariadb_root_password% mysql < setup_sql\mariadb\%%f 2>&1
+    
+:skip_run_mariadb_setup_script    
+
 REM Remove the download script and installers.
+:remove_download_script
 DEL %download_script_name%
-RMDIR /S /Q %installer_directory%
+IF %remove_installers%==true RMDIR /S /Q %installer_directory%
 
 SET /P dummy="Script complete"
