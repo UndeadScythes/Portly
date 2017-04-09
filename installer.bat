@@ -26,6 +26,8 @@ SET target_ruby_version=2.3.3
 SET target_git_version=2.12.0
 SET target_python_version=3.6.0
 SET target_mariadb_version=10.1.22
+SET target_apache_version=2.4.25
+SET target_sevenzip_version=1604
 
 REM Set credentials for anything that requires a username or password.
 SET mariadb_root_password=portly
@@ -35,9 +37,12 @@ SET install_ruby=false
 SET install_git=false
 SET install_python=false
 SET install_mariadb=false
+SET install_apache=true
+SET install_sevenzip=false
+SET install_unzip=true
 SET fetch_from_github=false
-SET run_mariadb_setup_sql=true
-SET remove_installers=true
+SET run_mariadb_setup_sql=false
+SET remove_installers=false
 
 REM Get the current path and set it as the Portly root path.
 CD %~dp0
@@ -58,6 +63,81 @@ ECHO $destination_directory = $args[1]>>%download_script_name%
 ECHO Invoke-WebRequest -Uri $source_url -OutFile $destination_directory>>%download_script_name%
 
 REM The order of these installers is entirely arbitrary and is based only on the debugging performed whilst writing the script.
+REM The exception to the rule: Unzip must come before Apache.
+
+REM --------------
+REM Install Unzip.
+REM --------------
+IF NOT %install_unzip%==true GOTO skip_install_unzip
+
+    SET unzip_url=http://stahlworks.com/dev/unzip.exe
+    SET unzip_directory=%portly_root_directory%\libraries\unzip
+    IF NOT EXIST %unzip_directory%\unzip.exe (
+        PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %unzip_url% %unzip_directory%
+        ECHO Unzip downloaded
+    ) ELSE ECHO Unzip already exists
+
+:skip_install_unzip
+
+REM --------------
+REM Install 7-Zip.
+REM --------------
+IF NOT %install_sevenzip%==true GOTO skip_install_sevenzip
+
+    SET sevenzip_installer_name=sevenzip_installer
+    SET sevenzip_installer_url=http://www.7-zip.org/a/7z%target_sevenzip_version%-x64.exe
+    SET sevenzip_installer_path=%installer_directory%\%sevenzip_installer_name%.exe
+    SET sevenzip_directory=%portly_root_directory%\libraries\7zip
+    
+    ECHO --------------------------------------------------------------------------------
+    ECHO Removing any previous copies of 7-Zip
+    IF EXIST %sevenzip_directory% RMDIR /S /Q %sevenzip_directory%
+
+    ECHO Downloading 7-Zip installer v%target_sevenzip_version%
+    IF NOT EXIST %sevenzip_installer_path% (
+        PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %sevenzip_installer_url% %sevenzip_installer_path%
+    ) ELSE ECHO Installer already exists
+    ECHO Installing 7-Zip v%target_sevenzip_version%
+    ECHO ========================================
+    ECHO This is a manual installation.
+    ECHO Please install to the following directory:
+    ECHO %sevenzip_directory%
+    ECHO ========================================
+    SET /P dummy="Hit enter to continue..."
+    %sevenzip_installer_path%
+    ECHO 7-Zip installation complete
+
+:skip_install_sevenzip
+
+REM ---------------
+REM Install Apache.
+REM ---------------
+IF NOT %install_apache%==true GOTO skip_install_apache
+
+    SET apache_installer_name=apache_installer
+    SET apache_installer_url=https://www.apachelounge.com/download/VC14/binaries/httpd-%target_apache_version%-win64-VC14.zip
+    SET apache_installer_path=%installer_directory%\%apache_installer_name%.zip
+    SET apache_directory=%portly_root_directory%\libraries\apache
+
+    ECHO --------------------------------------------------------------------------------
+    ECHO Removing any previous copies of Apache
+    IF EXIST %apache_directory% RMDIR /S /Q %apache_directory%
+
+    ECHO Downloading Apache installer v%target_apache_version%
+    IF NOT EXIST %apache_installer_path% (
+        PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %apache_installer_url% %apache_installer_path%
+    ) ELSE ECHO Installer already exists
+    
+    SET unzip_exe=%portly_root_directory%\libraries\unzip\unzip.exe
+    IF NOT EXIST %unzip_exe% (
+        ECHO Unzip does not exists, cannot install Apache
+        GOTO skip_install_apache
+    )
+    ECHO Installing Apache v%target_apache_version%
+    %unzip_exe% -q %apache_installer_path% -d %apache_directory%
+    ECHO Apache installation complete
+
+:skip_install_apache
 
 REM ---------------
 REM Install MariaDB.
@@ -76,9 +156,11 @@ IF NOT %install_mariadb%==true GOTO skip_install_mariadb
     IF EXIST %mariadb_directory% RMDIR /S /Q %mariadb_directory%
 
     ECHO Downloading MariaDB installer v%target_mariadb_version%
-    PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %mariadb_installer_url% %mariadb_installer_path%
+    IF NOT EXIST %mariadb_installer_path% (
+        PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %mariadb_installer_url% %mariadb_installer_path%
+    ) ELSE ECHO Installer already exists
     ECHO Installing MariaDB v%target_mariadb_version%
-    msiexec /i %mariadb_installer_path% INSTALLDIR=%mariadb_directory% PASSWORD=%mariadb_root_password% SERVICENAME=MySQL UTF8 /qn /L*V "%log_file_directory%\%mariadb_installer_name%.log"
+    msiexec /i %mariadb_installer_path% INSTALLDIR=%mariadb_directory% PASSWORD=%mariadb_root_password% SERVICENAME=MySQL UTF8=1 /qn /log %log_file_directory%\%mariadb_installer_name%.log
     ECHO MariaDB installation complete
 
     REM MariaDB uses the installer for uninstalling so we will copy it over to the MariaDB directory.
@@ -112,7 +194,9 @@ IF NOT %install_python%==true GOTO skip_install_python
     IF EXIST %python_directory% RMDIR /S /Q %python_directory%
 
     ECHO Downloading Python installer v%target_python_version%
-    PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %python_installer_url% %python_installer_path%
+    IF NOT EXIST %python_installer_path% (
+        PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %python_installer_url% %python_installer_path%
+    ) ELSE ECHO Installer already exists
     ECHO Installing Python v%target_python_version%
     START /WAIT %python_installer_path% /passive TargetDir=%python_directory% Shortcuts=0 Include_doc=0 Include_launcher=0 Include_pip=0 Include_tcltk=0 Include_test=0 Include_tools=0
     ECHO Python installation complete
@@ -157,7 +241,9 @@ IF NOT %install_git%==true GOTO skip_install_git
     IF EXIST %git_directory% RMDIR /S /Q %git_directory%
 
     ECHO Downloading Git installer v%target_git_version%
-    PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %git_installer_url% %git_installer_path%
+    IF NOT EXIST %git_installer_path% (
+        PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %git_installer_url% %git_installer_path%
+    ) ELSE ECHO Installer already exists
     ECHO Installing Git v%target_git_version%
     START /WAIT %git_installer_path% /SILENT /DIR="%git_directory%" /LOG="%log_file_directory%\%git_installer_name%.log"
     ECHO Git installation complete
@@ -191,7 +277,9 @@ IF NOT %install_ruby%==true GOTO skip_install_ruby
     IF EXIST %ruby_directory% RMDIR /S /Q %ruby_directory%
 
     ECHO Downloading Ruby installer v%target_ruby_version%
-    PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %ruby_installer_url% %ruby_installer_path%
+    IF NOT EXIST %ruby_installer_path% (
+        PowerShell.exe -ExecutionPolicy RemoteSigned -File %portly_root_directory%\download_file.ps1 %ruby_installer_url% %ruby_installer_path%
+    ) ELSE ECHO Installer already exists
     ECHO Installing Ruby v%target_ruby_version%
     START /WAIT %ruby_installer_path% /SILENT /DIR="%ruby_directory%" /TASKS="modpath" /LOG="%log_file_directory%\%ruby_installer_name%.log"
     ECHO Ruby installation complete
@@ -234,8 +322,8 @@ IF NOT %run_mariadb_setup_sql%==true GOTO skip_run_mariadb_setup_script
 :skip_run_mariadb_setup_script    
 
 REM Remove the download script and installers.
+IF %remove_installers%==true RMDIR /S /Q %installer_directory%
 :remove_download_script
 DEL %download_script_name%
-IF %remove_installers%==true RMDIR /S /Q %installer_directory%
 
 SET /P dummy="Script complete"
