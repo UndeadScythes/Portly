@@ -1,5 +1,14 @@
 # External libraries
 libraries/*
 
+# External temporary installers.
+installers/*
+
+# Portly project files.
+projects/*
+
+# Big MS-SQL ISOs.
+mssql/*
+
 # Log files.
 logs/*
